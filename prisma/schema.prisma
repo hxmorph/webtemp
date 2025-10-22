@@ -1,0 +1,323 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model UserAuth {
+  id            String    @id @default(cuid())
+  username      String?   @unique
+  email         String    @unique
+  phone         String?   @unique
+  passwordHash  String?
+  firebaseUid   String?   @unique
+  isVerified    Boolean   @default(false)
+  country       String    @default("IN")
+  createdVia    String    @default("email") // email, phone, google
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  profile       UserProfile?
+  activity      UserActivity[]
+  sessions      Session[]
+  orders        Order[]
+  reviews       ProductReview[]
+  wishlist      Wishlist[]
+  cart          CartItem[]
+  designRequests DesignRequest[]
+
+  @@index([email])
+  @@index([phone])
+}
+
+model UserProfile {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  fullName      String?
+  avatarUrl     String?
+  rank          String    @default("bronze") // bronze, silver, gold, platinum
+  address       Json?     // { street, city, state, zip, country }
+  totalSpend    Float     @default(0)
+  loyaltyPoints Int       @default(0)
+  preferences   Json?     // { notifications, newsletter, etc }
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user          UserAuth  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model UserActivity {
+  id            String    @id @default(cuid())
+  userId        String
+  activityType  String    // view, add_to_cart, wishlist, share, purchase, review
+  targetType    String    // product, order, review
+  targetId      String
+  metadata      Json?
+  ip            String?
+  userAgent     String?
+  occurredAt    DateTime  @default(now())
+
+  user          UserAuth  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([activityType])
+  @@index([occurredAt])
+}
+
+model Product {
+  id                    Int       @id @default(autoincrement())
+  sku                   String    @unique
+  name                  String
+  product_description   String?
+  primary_photo         String?
+  all_photos            String[]
+  video_urls            String[]
+  category              String
+  sub_category          String?
+  basic_color           String?
+  original_color        String?
+  material              String?
+  metal_type            String?
+  type                  String?
+  dimensions            String?
+  speciality            String?
+  mrp                   Float
+  selling_price         Float
+  inventory             Int       @default(0)
+  availability_status   String    @default("in_stock") // in_stock, low_stock, out_of_stock
+  featured_badge        Boolean   @default(false)
+  price_range_category  String?
+  tags                  String[]
+  color_variants        Json?
+  variants              Json?
+  care_instructions     String?
+  packaging_info        String?
+  shipping_details      String?
+  return_policy         String?
+  user_ratings          Float     @default(0)
+  reviews_count         Int       @default(0)
+  seo_meta              Json?
+  ai_keywords           String[]
+  freebie_offer         String?
+  stock_notify_list     String[]
+  offer_label           String?
+  coupon_codes          String[]
+  related_products      String[]
+  cross_sell_products   String[]
+  search_synonyms       String[]
+  view_count            Int       @default(0)
+  unique_view_count     Int       @default(0)
+  add_to_cart_count     Int       @default(0)
+  purchase_count        Int       @default(0)
+  wishlist_count        Int       @default(0)
+  share_count           Int       @default(0)
+  conversion_rate       Float     @default(0)
+  click_through_rate    Float     @default(0)
+  date_added            DateTime  @default(now())
+  last_updated          DateTime  @updatedAt
+
+  reviews               ProductReview[]
+  wishlists             Wishlist[]
+  cartItems             CartItem[]
+  orderItems            OrderItem[]
+  stats                 ProductStats?
+
+  @@index([sku])
+  @@index([category])
+  @@index([availability_status])
+  @@index([featured_badge])
+}
+
+model ProductStats {
+  id                String    @id @default(cuid())
+  productId         Int       @unique
+  daily_views       Int       @default(0)
+  daily_purchases   Int       @default(0)
+  weekly_trend      Float     @default(0)
+  monthly_trend     Float     @default(0)
+  last_updated      DateTime  @updatedAt
+
+  product           Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model ProductReview {
+  id                String    @id @default(cuid())
+  productId         Int
+  userId            String
+  rating            Int       // 1-5
+  title             String?
+  content           String?
+  verified_purchase Boolean   @default(false)
+  helpful_count     Int       @default(0)
+  unhelpful_count   Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  product           Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user              UserAuth  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([userId])
+}
+
+model Wishlist {
+  id                String    @id @default(cuid())
+  userId            String
+  productId         Int
+  addedAt           DateTime  @default(now())
+
+  user              UserAuth  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product           Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId])
+}
+
+model CartItem {
+  id                String    @id @default(cuid())
+  userId            String
+  productId         Int
+  quantity          Int       @default(1)
+  variant_selection Json?
+  addedAt           DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user              UserAuth  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product           Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId])
+}
+
+model Order {
+  id                    String    @id @default(cuid())
+  order_no              String    @unique
+  userId                String
+  items                 OrderItem[]
+  total_amount          Float
+  razorpay_order_id     String?
+  razorpay_payment_id   String?
+  payment_status        String    @default("pending") // pending, completed, failed
+  payment_verified      Boolean   @default(false)
+  shipping_address      Json
+  shiprocket_order_id   String?
+  shiprocket_tracking_id String?
+  delivery_status       String    @default("pending") // pending, shipped, delivered, cancelled
+  delivery_progress     Int       @default(0) // 0-100
+  expected_delivery_date DateTime?
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+
+  user                  UserAuth  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([order_no])
+  @@index([payment_status])
+  @@index([delivery_status])
+}
+
+model OrderItem {
+  id                String    @id @default(cuid())
+  orderId           String
+  productId         Int
+  quantity          Int
+  price_at_purchase Float
+  variant_selection Json?
+
+  order             Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product           Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+model Session {
+  id                String    @id @default(cuid())
+  userId            String
+  refreshToken      String    @unique
+  refreshTokenHash  String
+  expiresAt         DateTime
+  createdAt         DateTime  @default(now())
+  revokedAt         DateTime?
+
+  user              UserAuth  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Coupon {
+  id                String    @id @default(cuid())
+  code              String    @unique
+  discount_type     String    // percentage, fixed
+  discount_value    Float
+  max_uses          Int?
+  current_uses      Int       @default(0)
+  min_purchase      Float     @default(0)
+  valid_from        DateTime
+  valid_until       DateTime
+  is_active         Boolean   @default(true)
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  @@index([code])
+  @@index([is_active])
+}
+
+model Offer {
+  id                String    @id @default(cuid())
+  title             String
+  description       String?
+  offer_type        String    // discount, freebie, bundle
+  discount_value    Float?
+  freebie_product_id Int?
+  min_purchase      Float     @default(0)
+  max_discount      Float?
+  valid_from        DateTime
+  valid_until       DateTime
+  is_active         Boolean   @default(true)
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  @@index([is_active])
+}
+
+model DesignRequest {
+  id                String    @id @default(cuid())
+  userId            String
+  title             String
+  description       String?
+  file_url          String?
+  is_public         Boolean   @default(false)
+  commission_amount Float?
+  status            String    @default("pending") // pending, approved, rejected, completed
+  admin_notes       String?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  user              UserAuth  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model AuditLog {
+  id                String    @id @default(cuid())
+  action            String
+  entity_type       String
+  entity_id         String
+  changes           Json?
+  performed_by      String?
+  ip_address        String?
+  created_at        DateTime  @default(now())
+
+  @@index([entity_type])
+  @@index([created_at])
+}
